@@ -1,20 +1,46 @@
-pipeline{
+pipeline {
     agent any
-    stages{
-        stage('checkout'){
-            steps{
-                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/Venna12/taxi-booking.git']])
+
+    environment {
+        TOMCAT_WEBAPPS = '/opt/apache-tomcat-10.0.23/webapps'
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'dev', url: 'https://github.com/tabbu9/cab-booking.git'
             }
         }
-        stage('Build'){
-            steps{
-                sh "mvn package"
+
+        stage('Build WAR with Maven') {
+            steps {
+                dir('server') {
+                    sh 'mvn clean package'
+                }
             }
         }
-        stage('Deploy to tomcat'){
-            steps{
-                deploy adapters: [tomcat9(credentialsId: '527db3ea-545b-436b-bcbd-3c786d08d357', path: '', url: 'http://3.137.216.135:8080/')], contextPath: 'goutham', war: '**/*.war'
+
+        stage('Deploy WAR to Tomcat') {
+            steps {
+                sh '''
+                    WAR_FILE=$(ls server/target/*.war 2>/dev/null | head -n 1)
+                    if [ -z "$WAR_FILE" ]; then
+                        echo "ERROR: WAR file not found in server/target"
+                        exit 1
+                    fi
+                    echo "Deploying $WAR_FILE to $TOMCAT_WEBAPPS"
+                    cp "$WAR_FILE" "$TOMCAT_WEBAPPS/"
+                '''
             }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Deployment successful!'
+        }
+        failure {
+            echo '❌ Deployment failed.'
         }
     }
 }
