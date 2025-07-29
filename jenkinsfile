@@ -2,7 +2,9 @@ pipeline {
     agent any
 
     environment {
-        TOMCAT_WEBAPPS = '/opt/apache-tomcat-10.0.23/webapps'
+        NGINX_HOST = 'ec2-user@18.204.219.175'
+        NGINX_TARGET_DIR = '/usr/share/nginx/html'
+        WAR_BUILD_DIR = 'server/target'
     }
 
     stages {
@@ -20,16 +22,16 @@ pipeline {
             }
         }
 
-        stage('Deploy WAR to Tomcat') {
+        stage('Copy WAR to Nginx Server') {
             steps {
                 sh '''
-                    WAR_FILE=$(ls server/target/*.war 2>/dev/null | head -n 1)
+                    WAR_FILE=$(ls ${WAR_BUILD_DIR}/*.war 2>/dev/null | head -n 1)
                     if [ -z "$WAR_FILE" ]; then
-                        echo "ERROR: WAR file not found in server/target"
+                        echo "ERROR: WAR file not found"
                         exit 1
                     fi
-                    echo "Deploying $WAR_FILE to $TOMCAT_WEBAPPS"
-                    cp "$WAR_FILE" "$TOMCAT_WEBAPPS/"
+                    echo "Copying $WAR_FILE to ${NGINX_HOST}:${NGINX_TARGET_DIR}/"
+                    scp -o StrictHostKeyChecking=no "$WAR_FILE" ${NGINX_HOST}:${NGINX_TARGET_DIR}/
                 '''
             }
         }
@@ -37,10 +39,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Deployment successful!'
+            echo '✅ WAR successfully copied to Nginx server!'
         }
         failure {
-            echo '❌ Deployment failed.'
+            echo '❌ Build or Deployment failed.'
         }
     }
 }
