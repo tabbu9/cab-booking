@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         WAR_BUILD_DIR = 'server/target'
+        WAR_NAME = 'server.war'
         NGINX_USER_HOST = 'ec2-user@18.204.219.175'
         NGINX_TARGET_DIR = '/usr/share/nginx/html'
     }
@@ -25,37 +26,38 @@ pipeline {
         stage('Copy WAR to Nginx Server') {
             steps {
                 sh '''
-                    WAR_FILE=$(ls ${WAR_BUILD_DIR}/*.war 2>/dev/null | head -n 1)
-                    if [ -z "$WAR_FILE" ]; then
-                        echo "ERROR: WAR file not found"
+                    WAR_FILE="${WAR_BUILD_DIR}/${WAR_NAME}"
+                    if [ ! -f "$WAR_FILE" ]; then
+                        echo "❌ WAR file not found at $WAR_FILE"
                         exit 1
                     fi
 
-                    echo "Copying $WAR_FILE to ${NGINX_USER_HOST}:${NGINX_TARGET_DIR}/"
-                    scp -o StrictHostKeyChecking=no "$WAR_FILE" ${NGINX_USER_HOST}:${NGINX_TARGET_DIR}/
-
+                    echo "📤 Copying $WAR_FILE to ${NGINX_USER_HOST}:${NGINX_TARGET_DIR}/"
+                    scp -o StrictHostKeyChecking=no "$WAR_FILE" "${NGINX_USER_HOST}:${NGINX_TARGET_DIR}/"
                     echo "✔️ WAR copied successfully!"
                 '''
             }
         }
 
-        stage('(Optional) Extract WAR on Nginx Server') {
+        stage('Extract WAR on Nginx Server') {
             steps {
                 sh '''
                     ssh -o StrictHostKeyChecking=no ${NGINX_USER_HOST} << 'ENDSSH'
                         cd ${NGINX_TARGET_DIR}
                         WAR_FILE=$(ls *.war 2>/dev/null | head -n 1)
+
                         if [ -f "$WAR_FILE" ]; then
+                            echo "📦 Extracting $WAR_FILE..."
                             mkdir -p extracted
-                            unzip -o "$WAR_FILE" -d extracted
+                            unzip -o "$WAR_FILE" -d extracted > /dev/null 2>&1
                             mv extracted/* ./
                             rm -rf extracted "$WAR_FILE"
-                            echo "✅ WAR extracted on Nginx server."
+                            echo "✅ WAR extracted and cleaned up."
                         else
                             echo "❌ WAR file not found on Nginx server."
                             exit 1
                         fi
-                    ENDSSH
+ENDSSH
                 '''
             }
         }
@@ -63,10 +65,10 @@ pipeline {
 
     post {
         success {
-            echo '🚀 Deployment to Nginx complete!'
+            echo '🚀 Deployment to Nginx completed successfully!'
         }
         failure {
-            echo '❌ Deployment failed.'
+            echo '❌ Deployment failed. Check logs for details.'
         }
     }
 }
