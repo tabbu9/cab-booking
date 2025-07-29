@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     environment {
-        NGINX_HOST = 'ec2-user@18.204.219.175'
-        NGINX_TARGET_DIR = '/usr/share/nginx/html'
         WAR_BUILD_DIR = 'server/target'
+        NGINX_USER_HOST = 'ec2-user@18.204.219.175'
+        NGINX_TARGET_DIR = '/usr/share/nginx/html'
     }
 
     stages {
@@ -30,8 +30,32 @@ pipeline {
                         echo "ERROR: WAR file not found"
                         exit 1
                     fi
-                    echo "Copying $WAR_FILE to ${NGINX_HOST}:${NGINX_TARGET_DIR}/"
-                    scp -o StrictHostKeyChecking=no "$WAR_FILE" ${NGINX_HOST}:${NGINX_TARGET_DIR}/
+
+                    echo "Copying $WAR_FILE to ${NGINX_USER_HOST}:${NGINX_TARGET_DIR}/"
+                    scp -o StrictHostKeyChecking=no "$WAR_FILE" ${NGINX_USER_HOST}:${NGINX_TARGET_DIR}/
+
+                    echo "✔️ WAR copied successfully!"
+                '''
+            }
+        }
+
+        stage('(Optional) Extract WAR on Nginx Server') {
+            steps {
+                sh '''
+                    ssh -o StrictHostKeyChecking=no ${NGINX_USER_HOST} << 'ENDSSH'
+                        cd ${NGINX_TARGET_DIR}
+                        WAR_FILE=$(ls *.war 2>/dev/null | head -n 1)
+                        if [ -f "$WAR_FILE" ]; then
+                            mkdir -p extracted
+                            unzip -o "$WAR_FILE" -d extracted
+                            mv extracted/* ./
+                            rm -rf extracted "$WAR_FILE"
+                            echo "✅ WAR extracted on Nginx server."
+                        else
+                            echo "❌ WAR file not found on Nginx server."
+                            exit 1
+                        fi
+                    ENDSSH
                 '''
             }
         }
@@ -39,10 +63,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ WAR successfully copied to Nginx server!'
+            echo '🚀 Deployment to Nginx complete!'
         }
         failure {
-            echo '❌ Build or Deployment failed.'
+            echo '❌ Deployment failed.'
         }
     }
 }
