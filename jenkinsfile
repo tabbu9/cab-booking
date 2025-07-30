@@ -4,7 +4,8 @@ pipeline {
     environment {
         WAR_BUILD_DIR = 'server/target'
         WAR_NAME = 'server.war'
-        TOMCAT_WEBAPPS_DIR = '/opt/tomcat/webapps' // Change this if your Tomcat path is different
+        TOMCAT_HOME = '/opt/apache-tomcat-10.0.23'
+        TOMCAT_WEBAPPS_DIR = "${TOMCAT_HOME}/webapps"
     }
 
     stages {
@@ -25,25 +26,28 @@ pipeline {
         stage('Deploy WAR to Tomcat') {
             steps {
                 script {
-                    def warFile = "${env.WAR_BUILD_DIR}/${env.WAR_NAME}"
+                    def warPath = "${env.WAR_BUILD_DIR}/${env.WAR_NAME}"
                     sh """
-                        echo "📦 Checking if WAR exists: ${warFile}"
-                        if [ ! -f "${warFile}" ]; then
+                        echo "📦 Checking if WAR exists at ${warPath}"
+                        if [ ! -f "${warPath}" ]; then
                             echo "❌ WAR file not found!"
                             exit 1
                         fi
 
-                        echo "🧹 Cleaning previous deployment"
-                        rm -rf ${TOMCAT_WEBAPPS_DIR}/server
-                        rm -f ${TOMCAT_WEBAPPS_DIR}/${WAR_NAME}
+                        echo "🛑 Stopping Tomcat"
+                        sudo ${TOMCAT_HOME}/bin/shutdown.sh || echo "Tomcat may not have been running"
 
-                        echo "📤 Copying WAR to Tomcat webapps directory"
-                        cp "${warFile}" ${TOMCAT_WEBAPPS_DIR}/
+                        echo "🧹 Cleaning old deployment"
+                        sudo rm -rf ${TOMCAT_WEBAPPS_DIR}/server
+                        sudo rm -f ${TOMCAT_WEBAPPS_DIR}/${WAR_NAME}
 
-                        echo "🔁 Restarting Tomcat service"
-                        sudo systemctl restart tomcat || sudo systemctl restart tomcat9
+                        echo "📤 Copying new WAR to Tomcat"
+                        sudo cp "${warPath}" "${TOMCAT_WEBAPPS_DIR}/"
 
-                        echo "✅ Deployment completed"
+                        echo "🚀 Starting Tomcat"
+                        sudo ${TOMCAT_HOME}/bin/startup.sh
+
+                        echo "✅ Deployment complete!"
                     """
                 }
             }
@@ -52,10 +56,10 @@ pipeline {
 
     post {
         success {
-            echo '🚀 Deployment to local Tomcat completed successfully!'
+            echo '🚀 WAR successfully deployed to local Tomcat!'
         }
         failure {
-            echo '❌ Deployment failed. Check logs for details.'
+            echo '❌ Deployment failed. Please check the console output.'
         }
     }
 }
