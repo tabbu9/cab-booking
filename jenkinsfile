@@ -4,7 +4,7 @@ pipeline {
     environment {
         WAR_BUILD_DIR = 'server/target'
         WAR_NAME = 'server.war'
-        TOMCAT_WEBAPPS_DIR = '/opt/tomcat/webapps'  // adjust this path to your actual Tomcat location
+        TOMCAT_WEBAPPS_DIR = '/opt/tomcat/webapps' // Change this if your Tomcat path is different
     }
 
     stages {
@@ -25,19 +25,25 @@ pipeline {
         stage('Deploy WAR to Tomcat') {
             steps {
                 script {
-                    def warPath = "${env.WAR_BUILD_DIR}/${env.WAR_NAME}"
+                    def warFile = "${env.WAR_BUILD_DIR}/${env.WAR_NAME}"
                     sh """
-                        if [ ! -f "${warPath}" ]; then
-                            echo "❌ WAR file not found at ${warPath}"
+                        echo "📦 Checking if WAR exists: ${warFile}"
+                        if [ ! -f "${warFile}" ]; then
+                            echo "❌ WAR file not found!"
                             exit 1
                         fi
 
-                        echo "📦 Deploying WAR to Tomcat..."
-                        cp -f "${warPath}" "${TOMCAT_WEBAPPS_DIR}/"
-                        echo "✅ WAR copied to ${TOMCAT_WEBAPPS_DIR}/"
+                        echo "🧹 Cleaning previous deployment"
+                        rm -rf ${TOMCAT_WEBAPPS_DIR}/server
+                        rm -f ${TOMCAT_WEBAPPS_DIR}/${WAR_NAME}
 
-                        # Optional: restart Tomcat
-                        systemctl restart tomcat || systemctl restart tomcat9 || echo "⚠️ Tomcat restart skipped or failed."
+                        echo "📤 Copying WAR to Tomcat webapps directory"
+                        cp "${warFile}" ${TOMCAT_WEBAPPS_DIR}/
+
+                        echo "🔁 Restarting Tomcat service"
+                        sudo systemctl restart tomcat || sudo systemctl restart tomcat9
+
+                        echo "✅ Deployment completed"
                     """
                 }
             }
