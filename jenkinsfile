@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        TOMCAT_ROOT_DIR = '/opt/apache-tomcat-10.0.23/webapps/ROOT'
+        TOMCAT_ROOT_DIR = '/opt/apache-tomcat-10.0.23/webapps/server'
         WEBAPP_SOURCE = 'taxi-booking/src/main/webapp'
     }
 
