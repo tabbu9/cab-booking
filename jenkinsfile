@@ -4,8 +4,7 @@ pipeline {
     environment {
         WAR_BUILD_DIR = 'server/target'
         WAR_NAME = 'server.war'
-        NGINX_USER_HOST = 'ec2-user@18.204.219.175'
-        NGINX_TARGET_DIR = '/usr/share/nginx/html'
+        TOMCAT_WEBAPPS_DIR = '/opt/tomcat/webapps'  // adjust this path to your actual Tomcat location
     }
 
     stages {
@@ -23,49 +22,31 @@ pipeline {
             }
         }
 
-        stage('Copy WAR to Nginx Server') {
+        stage('Deploy WAR to Tomcat') {
             steps {
-                sh '''
-                    WAR_FILE="${WAR_BUILD_DIR}/${WAR_NAME}"
-                    if [ ! -f "$WAR_FILE" ]; then
-                        echo "❌ WAR file not found at $WAR_FILE"
-                        exit 1
-                    fi
-
-                    echo "📤 Copying $WAR_FILE to ${NGINX_USER_HOST}:${NGINX_TARGET_DIR}/"
-                    scp -o StrictHostKeyChecking=no "$WAR_FILE" "${NGINX_USER_HOST}:${NGINX_TARGET_DIR}/"
-                    echo "✔️ WAR copied successfully!"
-                '''
-            }
-        }
-
-        stage('Extract WAR on Nginx Server') {
-            steps {
-                sh '''
-                    ssh -o StrictHostKeyChecking=no ${NGINX_USER_HOST} << 'ENDSSH'
-                        cd ${NGINX_TARGET_DIR}
-                        WAR_FILE=$(ls *.war 2>/dev/null | head -n 1)
-
-                        if [ -f "$WAR_FILE" ]; then
-                            echo "📦 Extracting $WAR_FILE..."
-                            mkdir -p extracted
-                            unzip -o "$WAR_FILE" -d extracted > /dev/null 2>&1
-                            mv extracted/* ./
-                            rm -rf extracted "$WAR_FILE"
-                            echo "✅ WAR extracted and cleaned up."
-                        else
-                            echo "❌ WAR file not found on Nginx server."
+                script {
+                    def warPath = "${env.WAR_BUILD_DIR}/${env.WAR_NAME}"
+                    sh """
+                        if [ ! -f "${warPath}" ]; then
+                            echo "❌ WAR file not found at ${warPath}"
                             exit 1
                         fi
-ENDSSH
-                '''
+
+                        echo "📦 Deploying WAR to Tomcat..."
+                        cp -f "${warPath}" "${TOMCAT_WEBAPPS_DIR}/"
+                        echo "✅ WAR copied to ${TOMCAT_WEBAPPS_DIR}/"
+
+                        # Optional: restart Tomcat
+                        systemctl restart tomcat || systemctl restart tomcat9 || echo "⚠️ Tomcat restart skipped or failed."
+                    """
+                }
             }
         }
     }
 
     post {
         success {
-            echo '🚀 Deployment to Nginx completed successfully!'
+            echo '🚀 Deployment to local Tomcat completed successfully!'
         }
         failure {
             echo '❌ Deployment failed. Check logs for details.'
