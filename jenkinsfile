@@ -2,44 +2,36 @@ pipeline {
     agent any
 
     environment {
-        WAR_BUILD_DIR = 'server/target'
-        WAR_NAME = 'server.war'
-        TOMCAT_WEBAPPS_DIR = '/opt/apache-tomcat-10.0.23/webapps'
+        TOMCAT_ROOT_DIR = '/opt/apache-tomcat-10.0.23/webapps/ROOT'
+        WEBAPP_SOURCE = 'taxi-booking/src/main/webapp'
     }
 
     stages {
-        stage('Clone Repository') {
+        stage('Checkout Code') {
             steps {
                 git branch: 'dev', url: 'https://github.com/tabbu9/cab-booking.git'
             }
         }
 
-        stage('Build WAR with Maven') {
+        stage('Optional Build') {
             steps {
-                dir('server') {
+                dir('taxi-booking') {
                     sh 'mvn clean package'
                 }
             }
         }
 
-        stage('Deploy WAR to Tomcat') {
+        stage('Deploy to Tomcat ROOT') {
             steps {
                 script {
-                    def warPath = "${env.WAR_BUILD_DIR}/${env.WAR_NAME}"
                     sh """
-                        echo "📦 Checking if WAR exists at ${warPath}"
-                        if [ ! -f "${warPath}" ]; then
-                            echo "❌ WAR file not found!"
-                            exit 1
-                        fi
+                        echo "📦 Cleaning old ROOT directory..."
+                        sudo rm -rf ${TOMCAT_ROOT_DIR}/*
 
-                        echo "🧹 Cleaning old WAR"
-                        sudo -S rm -f ${TOMCAT_WEBAPPS_DIR}/${WAR_NAME}
+                        echo "📤 Copying webapp files to Tomcat ROOT..."
+                        sudo cp -r ${WEBAPP_SOURCE}/* ${TOMCAT_ROOT_DIR}/
 
-                        echo "📤 Deploying new WAR to Tomcat"
-                        sudo -S cp "${warPath}" "${TOMCAT_WEBAPPS_DIR}/"
-
-                        echo "✅ WAR deployed successfully!"
+                        echo "✅ Deployment complete!"
                     """
                 }
             }
@@ -48,10 +40,10 @@ pipeline {
 
     post {
         success {
-            echo '🚀 WAR successfully deployed to Tomcat!'
+            echo '🚀 Deployed webapp to Tomcat successfully!'
         }
         failure {
-            echo '❌ Deployment failed. Please check the logs.'
+            echo '❌ Deployment failed. Check logs and permissions.'
         }
     }
 }
