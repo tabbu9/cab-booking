@@ -4,8 +4,7 @@ pipeline {
     environment {
         WAR_BUILD_DIR = 'server/target'
         WAR_NAME = 'server.war'
-        TOMCAT_HOME = '/opt/apache-tomcat-10.0.23'
-        TOMCAT_WEBAPPS_DIR = "${TOMCAT_HOME}/webapps"
+        TOMCAT_WEBAPPS_DIR = '/opt/apache-tomcat-10.0.23/webapps'
     }
 
     stages {
@@ -34,20 +33,13 @@ pipeline {
                             exit 1
                         fi
 
-                        echo "🛑 Stopping Tomcat"
-                        sudo ${TOMCAT_HOME}/bin/shutdown.sh || echo "Tomcat may not have been running"
+                        echo "🧹 Cleaning old WAR"
+                        sudo -S rm -f ${TOMCAT_WEBAPPS_DIR}/${WAR_NAME}
 
-                        echo "🧹 Cleaning old deployment"
-                        sudo rm -rf ${TOMCAT_WEBAPPS_DIR}/server
-                        sudo rm -f ${TOMCAT_WEBAPPS_DIR}/${WAR_NAME}
+                        echo "📤 Deploying new WAR to Tomcat"
+                        sudo -S cp "${warPath}" "${TOMCAT_WEBAPPS_DIR}/"
 
-                        echo "📤 Copying new WAR to Tomcat"
-                        sudo cp "${warPath}" "${TOMCAT_WEBAPPS_DIR}/"
-
-                        echo "🚀 Starting Tomcat"
-                        sudo ${TOMCAT_HOME}/bin/startup.sh
-
-                        echo "✅ Deployment complete!"
+                        echo "✅ WAR deployed successfully!"
                     """
                 }
             }
@@ -56,10 +48,10 @@ pipeline {
 
     post {
         success {
-            echo '🚀 WAR successfully deployed to local Tomcat!'
+            echo '🚀 WAR successfully deployed to Tomcat!'
         }
         failure {
-            echo '❌ Deployment failed. Please check the console output.'
+            echo '❌ Deployment failed. Please check the logs.'
         }
     }
 }
