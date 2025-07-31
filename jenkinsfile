@@ -25,6 +25,9 @@ pipeline {
             steps {
                 script {
                     sh """
+                        echo "📁 Ensuring Tomcat deployment directory exists..."
+                        sudo mkdir -p ${TOMCAT_ROOT_DIR}
+
                         echo "📦 Cleaning old ROOT directory..."
                         sudo rm -rf ${TOMCAT_ROOT_DIR}/*
 
@@ -32,6 +35,10 @@ pipeline {
                         sudo cp -r ${WEBAPP_SOURCE}/* ${TOMCAT_ROOT_DIR}/
 
                         echo "✅ Deployment complete!"
+
+                        # Uncomment below if you want to restart Tomcat automatically
+                        # echo "🔁 Restarting Tomcat..."
+                        # sudo systemctl restart tomcat
                     """
                 }
             }
